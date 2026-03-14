@@ -1,12 +1,207 @@
-<!-- Index HTML File -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PenosaWebSim</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Penosa Desktop Sim</title>
+  <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-    <h1>Welcome to PenosaWebSim!</h1>
+  <main class="app-shell">
+    <section class="screen-shell">
+      <div class="screen-topline">
+        <span>PENOSA DESKTOP SIM</span>
+        <span>Euclidean + BassGroove</span>
+      </div>
+      <canvas id="tft" width="720" height="405" aria-label="Display da Penosa"></canvas>
+      <div class="screen-bottomline">
+        <span>SPACE: PLAY/STOP</span>
+        <span>Track 1-5</span>
+      </div>
+    </section>
+
+    <section class="controls-shell">
+      <div class="panel">
+        <h2>Transporte</h2>
+        <div class="row">
+          <button id="playToggle" class="primary">Play</button>
+          <button id="stepBtn">Step</button>
+          <button id="randomizeBtn">Randomize</button>
+          <button id="panicBtn">Panic</button>
+        </div>
+        <label class="slider-block">
+          <span>BPM <strong id="bpmValue">120</strong></span>
+          <input id="bpm" type="range" min="40" max="240" value="120">
+        </label>
+        <label class="checkbox-line">
+          <input id="autoRotate" type="checkbox">
+          <span>Auto-rotate downbeat</span>
+        </label>
+        <label class="slider-block">
+          <span>Master <strong id="masterValue">75%</strong></span>
+          <input id="master" type="range" min="0" max="100" value="75">
+        </label>
+      </div>
+
+      <div class="panel">
+        <h2>Tracks</h2>
+        <div id="trackButtons" class="track-grid"></div>
+        <div id="muteButtons" class="track-grid compact"></div>
+      </div>
+
+      <div class="panel">
+        <h2 id="editorTitle">Edit</h2>
+        <div id="drumEditor" class="editor-block">
+          <label class="slider-block">
+            <span>Steps <strong id="stepsValue"></strong></span>
+            <input id="steps" type="range" min="1" max="64" value="16">
+          </label>
+          <label class="slider-block">
+            <span>Hits <strong id="hitsValue"></strong></span>
+            <input id="hits" type="range" min="0" max="64" value="4">
+          </label>
+          <label class="slider-block">
+            <span>Rotation <strong id="rotationValue"></strong></span>
+            <input id="rotation" type="range" min="0" max="63" value="0">
+          </label>
+        </div>
+
+        <div id="bassEditor" class="editor-block hidden">
+          <label class="slider-block">
+            <span>Density <strong id="densityValue"></strong></span>
+            <input id="density" type="range" min="0" max="100" value="60">
+          </label>
+          <label class="slider-block">
+            <span>Range <strong id="rangeValue"></strong></span>
+            <input id="range" type="range" min="1" max="12" value="7">
+          </label>
+          <label class="select-block">
+            <span>Scale</span>
+            <select id="scale">
+              <option value="0">MIN</option>
+              <option value="1">MAJ</option>
+              <option value="2">DOR</option>
+              <option value="3">PHR</option>
+            </select>
+          </label>
+          <label class="slider-block">
+            <span>Root <strong id="rootValue"></strong></span>
+            <input id="root" type="range" min="24" max="48" value="36">
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Voice DSP</h2>
+        <div id="kickVoiceEditor" class="editor-block hidden">
+          <label class="slider-block">
+            <span>Tune <strong id="kickTuneValue"></strong></span>
+            <input id="kickTune" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Length <strong id="kickLengthValue"></strong></span>
+            <input id="kickLength" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Punch <strong id="kickPunchValue"></strong></span>
+            <input id="kickPunch" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Drive <strong id="kickDriveValue"></strong></span>
+            <input id="kickDrive" type="range" min="0" max="100" value="0">
+          </label>
+        </div>
+
+        <div id="snareVoiceEditor" class="editor-block hidden">
+          <label class="slider-block">
+            <span>Tone <strong id="snareToneValue"></strong></span>
+            <input id="snareTone" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Decay <strong id="snareDecayValue"></strong></span>
+            <input id="snareDecay" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Timbre <strong id="snareTimbreValue"></strong></span>
+            <input id="snareTimbre" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="select-block">
+            <span>Mode</span>
+            <select id="snareMode">
+              <option value="0">Snare</option>
+              <option value="1">Rim</option>
+              <option value="2">Clap</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="hatVoiceEditor" class="editor-block hidden">
+          <p id="hatModeLabel" class="voice-note"></p>
+          <label class="slider-block">
+            <span>Decay <strong id="hatDecayValue"></strong></span>
+            <input id="hatDecay" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Timbre <strong id="hatTimbreValue"></strong></span>
+            <input id="hatTimbre" type="range" min="0" max="100" value="50">
+          </label>
+        </div>
+
+        <div id="bassVoiceEditor" class="editor-block hidden">
+          <label class="slider-block">
+            <span>Release <strong id="bassReleaseValue"></strong></span>
+            <input id="bassRelease" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Brightness <strong id="bassBrightnessValue"></strong></span>
+            <input id="bassBrightness" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Harmonics <strong id="bassHarmonicsValue"></strong></span>
+            <input id="bassHarmonics" type="range" min="0" max="100" value="50">
+          </label>
+          <label class="slider-block">
+            <span>Drive <strong id="bassDriveValue"></strong></span>
+            <input id="bassDrive" type="range" min="0" max="100" value="0">
+          </label>
+          <label class="slider-block">
+            <span>Snap <strong id="bassSnapValue"></strong></span>
+            <input id="bassSnap" type="range" min="0" max="100" value="50">
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Slots</h2>
+        <div id="slotButtons" class="slot-grid"></div>
+        <div class="row">
+          <button id="saveSlotBtn">Save Slot</button>
+          <button id="resetSlotsBtn">Factory Reset</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Algorithm Lab</h2>
+        <label class="slider-block">
+          <span>Seed RNG</span>
+          <input id="seedInput" type="number" min="1" max="4294967295" value="1592654542">
+        </label>
+        <div class="row">
+          <button id="applySeedBtn">Apply Seed</button>
+          <button id="exportStateBtn">Export State</button>
+          <button id="importStateBtn">Import State</button>
+        </div>
+        <textarea id="stateDump" class="dump-area" spellcheck="false" placeholder="Estado JSON para export/import"></textarea>
+      </div>
+
+      <div class="panel">
+        <h2>Debug</h2>
+        <pre id="debugSummary" class="debug-block"></pre>
+        <pre id="patternSummary" class="debug-block"></pre>
+      </div>
+    </section>
+  </main>
+
+  <script src="./app.js"></script>
 </body>
 </html>
