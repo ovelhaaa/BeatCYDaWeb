@@ -1,4 +1,4 @@
-0const SCREEN_W = 240;
+const SCREEN_W = 240;
 const SCREEN_H = 135;
 const CANVAS_SCALE = 3;
 const TRACK_COUNT = 5;
@@ -16,7 +16,7 @@ const TRACK_NAMES = ["KICK", "SNARE", "HATS", "CRASH", "BASS"];
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const BASS_ROOT_MIN = 24;
 const BASS_ROOT_MAX = 48;
-const STORAGE_KEY = "penosa-desktop-sim-slots-v1";
+const STORAGE_KEY = "penosa-desktop-sim-slots-v2";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -50,10 +50,20 @@ function cloneVoiceParamsList(list) {
 
 function normalizeVoiceParamsList(list) {
   const defaults = createDefaultVoiceParams();
-  return defaults.map((voice, index) => ({
-    ...voice,
-    ...(Array.isArray(list) ? list[index] : {}),
-  }));
+  if (!Array.isArray(list)) return defaults;
+
+  return defaults.map((voice, index) => {
+    const item = list[index] || {};
+    return {
+      pitch: clamp(Number(item.pitch ?? voice.pitch), 0, 1),
+      decay: clamp(Number(item.decay ?? voice.decay), 0, 1),
+      timbre: clamp(Number(item.timbre ?? voice.timbre), 0, 1),
+      drive: clamp(Number(item.drive ?? voice.drive), 0, 1),
+      snap: clamp(Number(item.snap ?? voice.snap), 0, 1),
+      harmonics: clamp(Number(item.harmonics ?? voice.harmonics), 0, 1),
+      mode: Math.max(0, Math.min(2, Math.round(Number(item.mode ?? voice.mode)))),
+    };
+  });
 }
 
 function calculateEnvMul(seconds, sampleRate) {
@@ -449,6 +459,7 @@ class AudioEngine {
     this.activeSources.forEach((source) => {
       try {
         source.stop(time);
+        source.disconnect();
       } catch (_) {
         // Source may have already ended.
       }
@@ -510,13 +521,20 @@ class AudioEngine {
     return curve;
   }
 
-  playBuffer(buffer) {
+  playBuffer(buffer, time = null) {
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(this.master);
-    source.addEventListener("ended", () => this.activeSources.delete(source));
+    source.addEventListener("ended", () => {
+      source.disconnect();
+      this.activeSources.delete(source);
+    });
     this.activeSources.add(source);
-    source.start();
+    if (time !== null) {
+      source.start(time);
+    } else {
+      source.start();
+    }
     return source;
   }
 
@@ -748,7 +766,7 @@ class AudioEngine {
     return buffer;
   }
 
-  trigger(trackIndex, velocity, bassEvent = null) {
+  trigger(trackIndex, velocity, bassEvent = null, time = null) {
     if (!this.ctx) return;
 
     if (trackIndex >= 0 && trackIndex <= 3) {
@@ -761,12 +779,12 @@ class AudioEngine {
         else if (trackIndex === 3) buffer = this.buildHatBuffer(velocity, true);
         this.drumCache.set(cacheKey, buffer);
       }
-      this.playBuffer(buffer);
+      this.playBuffer(buffer, time);
       return;
     }
 
     if (trackIndex === 4 && bassEvent) {
-      this.triggerBass(this.ctx.currentTime, bassEvent);
+      this.triggerBass(time !== null ? time : this.ctx.currentTime, bassEvent);
     }
   }
 
@@ -955,16 +973,58 @@ class PenosaDesktopSim {
     ];
   }
 
+  normalizeSlot(parsed, defaultSlot) {
+    if (typeof parsed !== "object" || parsed === null) return defaultSlot;
+
+    const bpm = clamp(Number(parsed.bpm ?? defaultSlot.bpm), 40, 240);
+    const autoRotateDownbeat = Boolean(parsed.autoRotateDownbeat ?? defaultSlot.autoRotateDownbeat);
+    const globalRoot = clamp(Number(parsed.globalRoot ?? defaultSlot.globalRoot), 0, 11);
+    const globalScale = clamp(Number(parsed.globalScale ?? defaultSlot.globalScale), 0, 3);
+    const bassDensity = clamp(Number(parsed.bassDensity ?? defaultSlot.bassDensity), 0, 0.8);
+    const bassRange = clamp(Math.round(Number(parsed.bassRange ?? defaultSlot.bassRange)), 1, 12);
+    const bassRootNote = clamp(Math.round(Number(parsed.bassRootNote ?? defaultSlot.bassRootNote)), BASS_ROOT_MIN, BASS_ROOT_MAX);
+    const voiceParams = normalizeVoiceParamsList(parsed.voiceParams ?? defaultSlot.voiceParams);
+
+    let tracks = defaultSlot.tracks;
+    if (Array.isArray(parsed.tracks) && parsed.tracks.length === TRACK_COUNT) {
+      tracks = parsed.tracks.map((track, i) => ({
+        steps: clamp(Number(track.steps ?? defaultSlot.tracks[i].steps), 1, 64),
+        hits: clamp(Number(track.hits ?? defaultSlot.tracks[i].hits), 0, 64),
+        rotationOffset: Math.max(0, Number(track.rotationOffset ?? defaultSlot.tracks[i].rotationOffset)),
+      }));
+    }
+
+    return {
+      bpm,
+      autoRotateDownbeat,
+      globalRoot,
+      globalScale,
+      bassDensity,
+      bassRange,
+      bassRootNote,
+      voiceParams,
+      tracks,
+    };
+  }
+
   restoreSlots() {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    let saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) {
+      // Tenta recuperar os antigos da v1
+      saved = localStorage.getItem("penosa-desktop-sim-slots-v1");
+    }
+
     if (!saved) return;
     try {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length === this.slots.length) {
-        this.slots = parsed;
+        this.slots = parsed.map((slot, i) => this.normalizeSlot(slot, this.slots[i]));
+      } else {
+        throw new Error("Formato de slots inválido");
       }
     } catch (error) {
-      console.warn("Falha ao restaurar slots", error);
+      console.warn("Falha ao restaurar slots, usando de fábrica:", error);
+      this.slots = this.createFactorySlots();
     }
   }
 
@@ -1269,11 +1329,18 @@ class PenosaDesktopSim {
     this.scheduler = setInterval(() => this.tick(), stepMs);
   }
 
-  tick() {
+  tick(offlineTime = null) {
     const stepMs = 60000 / (this.bpm * 4);
-    this.bassGroove.process(stepMs);
+
+    // We only process timing ms offline if it's passed explicitly
+    if (offlineTime === null) {
+      this.bassGroove.process(stepMs);
+    }
     const step = this.currentStep;
-    this.bassVoiceHoldMs = Math.max(0, this.bassVoiceHoldMs - stepMs);
+
+    if (offlineTime === null) {
+      this.bassVoiceHoldMs = Math.max(0, this.bassVoiceHoldMs - stepMs);
+    }
     let bassIsActive = this.bassVoiceHoldMs > 0;
     const events = [];
     const rhythm = {
@@ -1311,7 +1378,7 @@ class PenosaDesktopSim {
         rhythm.hatOpenVelocity = velocity;
       }
       if (i !== VOICE_BASS) {
-        this.audio.trigger(i, velocity);
+        this.audio.trigger(i, velocity, null, offlineTime);
         events.push(`${TRACK_NAMES[i]}:${velocity.toFixed(2)}`);
       }
     }
@@ -1319,19 +1386,303 @@ class PenosaDesktopSim {
     if (!this.trackMutes[VOICE_BASS]) {
       const bassEvent = this.bassGroove.onTick(step, bassIsActive, rhythm);
       if (bassEvent) {
-        this.audio.trigger(VOICE_BASS, bassEvent.velocity, bassEvent);
+        this.audio.trigger(VOICE_BASS, bassEvent.velocity, bassEvent, offlineTime);
         bassIsActive = true;
         this.bassVoiceHoldMs = bassEvent.gateMs ?? (120 + this.voiceParams[VOICE_BASS].decay * 420);
         events.push(`BASS:${noteName(bassEvent.note)}:${bassEvent.velocity.toFixed(2)}${bassEvent.slide ? ":slide" : ""}`);
       }
     }
 
-    this.pushEventLog(step, events);
+    if (offlineTime === null) {
+      this.pushEventLog(step, events);
+    }
     this.currentStep += 1;
-    if (this.currentStep !== this.lastBeatStep) {
+    if (offlineTime === null && this.currentStep !== this.lastBeatStep) {
       this.pulseScale = 1.4;
       this.lastBeatStep = this.currentStep;
     }
+  }
+
+  async exportWAV() {
+    const stepMs = 60000 / (this.bpm * 4);
+    const patternSteps = 64; // Export 4 bars (64 steps)
+    const durationMs = stepMs * patternSteps;
+    const durationSec = durationMs / 1000;
+
+    const sampleRate = 44100;
+    const offlineCtx = new window.OfflineAudioContext(2, sampleRate * durationSec, sampleRate);
+
+    // Create completely isolated simulation instance for export
+    const offlineSim = new PenosaDesktopSim();
+    offlineSim.importState(this.serializeState()); // Clone current setup
+
+    offlineSim.audio.ctx = offlineCtx;
+    offlineSim.audio.master = offlineCtx.createGain();
+    offlineSim.audio.master.gain.value = this.masterVolume;
+
+    const comp = offlineCtx.createDynamicsCompressor();
+    comp.threshold.value = -16;
+    comp.knee.value = 12;
+    comp.ratio.value = 3;
+    comp.attack.value = 0.003;
+    comp.release.value = 0.12;
+    offlineSim.audio.master.connect(comp);
+    comp.connect(offlineCtx.destination);
+
+    // Create new bass node for offline
+    offlineSim.audio.bass = offlineSim.audio.createBassVoice();
+    offlineSim.audio.setVoiceParams(this.voiceParams);
+
+    // Start with deterministic seeds and step 0
+    offlineSim.setSeed(this.seed);
+    offlineSim.currentStep = 0;
+    offlineSim.bassVoiceHoldMs = 0;
+
+    // Schedule ticks isolated from main app
+    for (let s = 0; s < patternSteps; s++) {
+      const time = s * (stepMs / 1000);
+      offlineSim.bassGroove.process(stepMs);
+      offlineSim.tick(time);
+    }
+
+    // Render
+    const renderedBuffer = await offlineCtx.startRendering();
+
+    // Convert to WAV
+    const wavBlob = this.audioBufferToWav(renderedBuffer);
+    const url = URL.createObjectURL(wavBlob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "penosa-export.wav";
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+    // Cleanup isolated instances
+    try { offlineSim.audio.stopAll(); } catch(e){}
+  }
+
+  audioBufferToWav(buffer) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+
+    const result = new Float32Array(buffer.length * numChannels);
+    for (let channel = 0; channel < numChannels; channel++) {
+      const channelData = buffer.getChannelData(channel);
+      for (let i = 0; i < buffer.length; i++) {
+        result[i * numChannels + channel] = channelData[i];
+      }
+    }
+
+    const dataLength = result.length * (bitDepth / 8);
+    const bufferArray = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(bufferArray);
+
+    // RIFF chunk descriptor
+    this.writeString(view, 0, "RIFF");
+    view.setUint32(4, 36 + dataLength, true);
+    this.writeString(view, 8, "WAVE");
+
+    // fmt sub-chunk
+    this.writeString(view, 12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, format, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * (bitDepth / 8), true);
+    view.setUint16(32, numChannels * (bitDepth / 8), true);
+    view.setUint16(34, bitDepth, true);
+
+    // data sub-chunk
+    this.writeString(view, 36, "data");
+    view.setUint32(40, dataLength, true);
+
+    // write PCM samples
+    let offset = 44;
+    for (let i = 0; i < result.length; i++) {
+      const sample = Math.max(-1, Math.min(1, result[i]));
+      view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+      offset += 2;
+    }
+
+    return new Blob([view], { type: "audio/wav" });
+  }
+
+  writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
+
+  exportMIDI() {
+    const patternSteps = 64; // 4 bars
+    const ticksPerBeat = 96;
+    const ticksPerStep = ticksPerBeat / 4; // 16th notes = 24 ticks
+    const drumChannel = 9; // 0-indexed channel 10
+    const bassChannel = 0; // 0-indexed channel 1
+
+    // Drum Map: Kick=36, Snare=38, HatClosed=42, HatOpen=46
+    const drumNotes = [36, 38, 42, 46];
+
+    // Create completely isolated simulation instance for export
+    const offlineSim = new PenosaDesktopSim();
+    offlineSim.importState(this.serializeState()); // Clone current setup
+
+    offlineSim.setSeed(this.seed);
+    offlineSim.currentStep = 0;
+    offlineSim.bassVoiceHoldMs = 0;
+
+    let bassEvents = [];
+    let drumEvents = [];
+
+    let pendingBassNoteOff = null;
+
+    for (let s = 0; s < patternSteps; s++) {
+      const stepMs = 60000 / (offlineSim.bpm * 4); // Keep for RNG calls
+      offlineSim.bassGroove.process(stepMs);
+
+      const rhythm = {
+        kick: false,
+        snare: false,
+        hatClosed: false,
+        hatOpen: false,
+        kickVelocity: 0,
+        snareVelocity: 0,
+        hatClosedVelocity: 0,
+        hatOpenVelocity: 0,
+      };
+
+      let bassIsActive = false; // We ignore actual time here, just use RNG state
+
+      for (let i = 0; i < TRACK_COUNT; i += 1) {
+        const track = offlineSim.tracks[i];
+        if (track.patternLen <= 0 || offlineSim.trackMutes[i]) continue;
+        const value = track.pattern[s % track.patternLen];
+        if (value <= 0) continue;
+        const velocity = value === 1 ? 0.9 : value / 127;
+
+        if (i === 0) {
+          offlineSim.bassGroove.onKick();
+          rhythm.kick = true;
+          rhythm.kickVelocity = velocity;
+        } else if (i === 1) {
+          rhythm.snare = true;
+          rhythm.snareVelocity = velocity;
+        } else if (i === 2) {
+          rhythm.hatClosed = true;
+          rhythm.hatClosedVelocity = velocity;
+        } else if (i === 3) {
+          rhythm.hatOpen = true;
+          rhythm.hatOpenVelocity = velocity;
+        }
+
+        if (i < 4) {
+          const midiVel = Math.round(velocity * 127);
+          drumEvents.push({ type: 'noteOn', tick: s * ticksPerStep, channel: drumChannel, note: drumNotes[i], velocity: midiVel });
+          drumEvents.push({ type: 'noteOff', tick: s * ticksPerStep + (ticksPerStep - 2), channel: drumChannel, note: drumNotes[i], velocity: 0 });
+        }
+      }
+
+      if (!offlineSim.trackMutes[VOICE_BASS]) {
+        const bassEvent = offlineSim.bassGroove.onTick(s, bassIsActive, rhythm);
+        if (bassEvent) {
+          if (pendingBassNoteOff) {
+            // Note off before note on if sliding
+            pendingBassNoteOff.tick = s * ticksPerStep - (bassEvent.slide ? 0 : 2);
+            bassEvents.push(pendingBassNoteOff);
+          }
+          const midiVel = Math.round(bassEvent.velocity * 127);
+          bassEvents.push({ type: 'noteOn', tick: s * ticksPerStep, channel: bassChannel, note: bassEvent.note, velocity: midiVel });
+
+          const gateTicks = Math.round((bassEvent.gateMs / stepMs) * ticksPerStep);
+          pendingBassNoteOff = { type: 'noteOff', tick: s * ticksPerStep + gateTicks, channel: bassChannel, note: bassEvent.note, velocity: 0 };
+        }
+      }
+      offlineSim.currentStep += 1;
+    }
+
+    if (pendingBassNoteOff) {
+      bassEvents.push(pendingBassNoteOff);
+    }
+
+    const serializeTrack = (events, trackName) => {
+      events.sort((a, b) => a.tick - b.tick);
+
+      const trackData = [];
+
+      // Track Name Meta Event
+      trackData.push(0x00, 0xFF, 0x03, trackName.length, ...[...trackName].map(c => c.charCodeAt(0)));
+
+      let lastTick = 0;
+      for (const ev of events) {
+        let delta = Math.max(0, ev.tick - lastTick);
+        lastTick = ev.tick;
+
+        // Write Variable Length Quantity (VLQ)
+        const vlq = [];
+        let buffer = delta & 0x7F;
+        while ((delta >>= 7) > 0) {
+          buffer <<= 8;
+          buffer |= (delta & 0x7F) | 0x80;
+        }
+        while (true) {
+          vlq.push(buffer & 0xFF);
+          if (buffer & 0x80) buffer >>= 8;
+          else break;
+        }
+        trackData.push(...vlq);
+
+        if (ev.type === 'noteOn') {
+          trackData.push(0x90 | ev.channel, ev.note, ev.velocity);
+        } else if (ev.type === 'noteOff') {
+          trackData.push(0x80 | ev.channel, ev.note, ev.velocity);
+        }
+      }
+      // End of Track
+      trackData.push(0x00, 0xFF, 0x2F, 0x00);
+      return trackData;
+    };
+
+    const header = [
+      0x4D, 0x54, 0x68, 0x64, // MThd
+      0x00, 0x00, 0x00, 0x06, // Header size
+      0x00, 0x01,             // Format 1 (multi-track)
+      0x00, 0x03,             // 3 tracks (Tempo, Drums, Bass)
+      (ticksPerBeat >> 8) & 0xFF, ticksPerBeat & 0xFF // Resolution
+    ];
+
+    const tempoTrack = [
+      0x00, 0xFF, 0x03, 0x0C, ...[..."Tempo & Time"].map(c => c.charCodeAt(0)), // Name
+      0x00, 0xFF, 0x58, 0x04, 0x04, 0x02, 0x18, 0x08, // Time Signature 4/4
+      0x00, 0xFF, 0x51, 0x03, ...[0,0,0].map((_, i) => (Math.round(60000000 / this.bpm) >> ((2 - i) * 8)) & 0xFF), // Tempo
+      0x00, 0xFF, 0x2F, 0x00 // End of track
+    ];
+
+    const drumTrackData = serializeTrack(drumEvents, "Penosa Drums");
+    const bassTrackData = serializeTrack(bassEvents, "Penosa Bass");
+
+    const writeTrackChunk = (data) => {
+      const len = data.length;
+      return [0x4D, 0x54, 0x72, 0x6B, (len >> 24) & 0xFF, (len >> 16) & 0xFF, (len >> 8) & 0xFF, len & 0xFF, ...data];
+    };
+
+    const midiData = new Uint8Array([
+      ...header,
+      ...writeTrackChunk(tempoTrack),
+      ...writeTrackChunk(drumTrackData),
+      ...writeTrackChunk(bassTrackData)
+    ]);
+
+    const blob = new Blob([midiData], { type: "audio/midi" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "penosa-export.mid";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }
 
@@ -1799,6 +2150,31 @@ function bindUi() {
       updateUi();
     } catch (error) {
       window.alert(`JSON invalido: ${error.message}`);
+    }
+  });
+
+  document.getElementById("exportWavBtn").addEventListener("click", async () => {
+    const btn = document.getElementById("exportWavBtn");
+    const origText = btn.textContent;
+    btn.textContent = "Rendering...";
+    btn.disabled = true;
+    try {
+      await sim.exportWAV();
+    } catch (error) {
+      window.alert(`Erro ao exportar WAV: ${error.message}`);
+      console.error(error);
+    } finally {
+      btn.textContent = origText;
+      btn.disabled = false;
+    }
+  });
+
+  document.getElementById("exportMidiBtn").addEventListener("click", () => {
+    try {
+      sim.exportMIDI();
+    } catch (error) {
+      window.alert(`Erro ao exportar MIDI: ${error.message}`);
+      console.error(error);
     }
   });
 
