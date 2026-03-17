@@ -221,6 +221,10 @@ class BassGroove {
     if (this.restSteps >= 3) probability += 0.12;
     if (context.activeCount >= 3) probability += 0.08;
     if (context.bassIsActive && !context.kick && !context.snare) probability *= 0.82;
+
+    // Multiplicador do controle de probabilidade do baixo
+    probability *= this.params.bassProb;
+
     return clamp(probability, 0, 1);
   }
 
@@ -909,9 +913,11 @@ class PenosaDesktopSim {
     const makeSlot = (overrides = {}) => ({
       bpm: 120,
       autoRotateDownbeat: false,
+      ghostNotesProb: 0.15,
       globalRoot: 0,
       globalScale: 0,
       bassDensity: 0.6,
+      bassProb: 1.0,
       bassRange: 7,
       bassRootNote: 36,
       voiceParams: createDefaultVoiceParams(),
@@ -1017,9 +1023,11 @@ class PenosaDesktopSim {
 
     const bpm = clamp(Number(parsed.bpm ?? defaultSlot.bpm), 40, 240);
     const autoRotateDownbeat = Boolean(parsed.autoRotateDownbeat ?? defaultSlot.autoRotateDownbeat);
+    const ghostNotesProb = clamp(Number(parsed.ghostNotesProb ?? defaultSlot.ghostNotesProb), 0, 1.0);
     const globalRoot = clamp(Number(parsed.globalRoot ?? defaultSlot.globalRoot), 0, 11);
     const globalScale = clamp(Number(parsed.globalScale ?? defaultSlot.globalScale), 0, 3);
     const bassDensity = clamp(Number(parsed.bassDensity ?? defaultSlot.bassDensity), 0, 0.8);
+    const bassProb = clamp(Number(parsed.bassProb ?? defaultSlot.bassProb), 0, 1.0);
     const bassRange = clamp(Math.round(Number(parsed.bassRange ?? defaultSlot.bassRange)), 1, 12);
     const bassRootNote = clamp(Math.round(Number(parsed.bassRootNote ?? defaultSlot.bassRootNote)), BASS_ROOT_MIN, BASS_ROOT_MAX);
     const voiceParams = normalizeVoiceParamsList(parsed.voiceParams ?? defaultSlot.voiceParams);
@@ -1036,9 +1044,11 @@ class PenosaDesktopSim {
     return {
       bpm,
       autoRotateDownbeat,
+      ghostNotesProb,
       globalRoot,
       globalScale,
       bassDensity,
+      bassProb,
       bassRange,
       bassRootNote,
       voiceParams,
@@ -1082,6 +1092,7 @@ class PenosaDesktopSim {
     const slot = this.slots[index];
     this.bpm = slot.bpm;
     this.autoRotateDownbeat = slot.autoRotateDownbeat;
+    this.ghostNotesProb = slot.ghostNotesProb ?? 0.15;
     this.globalRoot = slot.globalRoot;
     this.globalScale = slot.globalScale;
     this.tracks = slot.tracks.map((track) => this.createTrack(track.steps, track.hits));
@@ -1094,6 +1105,7 @@ class PenosaDesktopSim {
       rootNote: slot.bassRootNote,
       scaleType: slot.globalScale,
       density: slot.bassDensity,
+      bassProb: slot.bassProb ?? 1.0,
       range: slot.bassRange,
     });
     this.bassVoicePitch = this.bassRootNoteToPitch(slot.bassRootNote);
@@ -1110,9 +1122,11 @@ class PenosaDesktopSim {
     this.slots[this.currentSlot] = {
       bpm: this.bpm,
       autoRotateDownbeat: this.autoRotateDownbeat,
+      ghostNotesProb: this.ghostNotesProb,
       globalRoot: this.globalRoot,
       globalScale: this.globalScale,
       bassDensity: bass.density,
+      bassProb: bass.bassProb,
       bassRange: bass.range,
       bassRootNote: bass.rootNote,
       voiceParams: normalizeVoiceParamsList(this.voiceParams),
@@ -1256,9 +1270,9 @@ class PenosaDesktopSim {
         track.pattern[i] = clamp(baseVelocity + hum, 1, 127);
       } else {
         // Em tracks SNARE (1), HATS (2) e CRASH (3), injetar ghost notes
-        // em steps vazios com ~15% de chance e velocity 20..34
-        if (trackIndex >= 1 && trackIndex <= 3) {
-          if (this.randomUnit() < 0.15) {
+        // em steps vazios usando a probabilidade global (ghostNotesProb) e velocity 20..34
+        if (trackIndex >= 1 && trackIndex <= 3 && this.ghostNotesProb > 0) {
+          if (this.randomUnit() < this.ghostNotesProb) {
             let ghostVelocity = 20 + Math.floor(this.randomUnit() * 15);
             track.pattern[i] = clamp(ghostVelocity, 1, 127);
           }
@@ -1281,6 +1295,7 @@ class PenosaDesktopSim {
       {
         bpm: this.bpm,
         autoRotateDownbeat: this.autoRotateDownbeat,
+        ghostNotesProb: this.ghostNotesProb,
         globalRoot: this.globalRoot,
         globalScale: this.globalScale,
         masterVolume: this.masterVolume,
@@ -1306,6 +1321,7 @@ class PenosaDesktopSim {
     const parsed = JSON.parse(jsonText);
     this.bpm = clamp(Number(parsed.bpm ?? this.bpm), 40, 240);
     this.autoRotateDownbeat = Boolean(parsed.autoRotateDownbeat);
+    this.ghostNotesProb = clamp(Number(parsed.ghostNotesProb ?? this.ghostNotesProb ?? 0.15), 0, 1.0);
     this.globalRoot = clamp(Number(parsed.globalRoot ?? this.globalRoot), 0, 11);
     this.globalScale = clamp(Number(parsed.globalScale ?? this.globalScale), 0, 3);
     this.masterVolume = clamp(Number(parsed.masterVolume ?? this.masterVolume), 0, 1);
@@ -1912,6 +1928,8 @@ function updateUi() {
   document.getElementById("bpm").value = sim.bpm;
   document.getElementById("bpmValue").textContent = String(sim.bpm);
   document.getElementById("autoRotate").checked = sim.autoRotateDownbeat;
+  document.getElementById("ghostNotes").value = Math.round(sim.ghostNotesProb * 100);
+  document.getElementById("ghostNotesValue").textContent = `${Math.round(sim.ghostNotesProb * 100)}%`;
   document.getElementById("master").value = Math.round(sim.masterVolume * 100);
   document.getElementById("masterValue").textContent = `${Math.round(sim.masterVolume * 100)}%`;
   document.getElementById("seedInput").value = String(sim.seed >>> 0);
@@ -1946,6 +1964,8 @@ function updateUi() {
     const bass = sim.bassGroove.cloneParams();
     document.getElementById("density").value = Math.round(bass.density * 100);
     document.getElementById("densityValue").textContent = `${Math.round(bass.density * 100)}%`;
+    document.getElementById("bassProb").value = Math.round(bass.bassProb * 100);
+    document.getElementById("bassProbValue").textContent = `${Math.round(bass.bassProb * 100)}%`;
     document.getElementById("range").value = bass.range;
     document.getElementById("rangeValue").textContent = String(bass.range);
     document.getElementById("scale").value = String(bass.scaleType);
@@ -2094,6 +2114,11 @@ function bindUi() {
     for (let i = 0; i < TRACK_COUNT; i += 1) sim.recalculatePattern(i);
     updateUi();
   });
+  document.getElementById("ghostNotes").addEventListener("input", (event) => {
+    sim.ghostNotesProb = Number(event.target.value) / 100;
+    for (let i = 0; i < TRACK_COUNT; i += 1) sim.recalculatePattern(i);
+    updateUi();
+  });
   document.getElementById("master").addEventListener("input", (event) => {
     sim.masterVolume = Number(event.target.value) / 100;
     sim.audio.ensureStarted();
@@ -2122,6 +2147,10 @@ function bindUi() {
 
   document.getElementById("density").addEventListener("input", (event) => {
     sim.bassGroove.updateParams({ density: Number(event.target.value) / 100 });
+    updateUi();
+  });
+  document.getElementById("bassProb").addEventListener("input", (event) => {
+    sim.bassGroove.updateParams({ bassProb: Number(event.target.value) / 100 });
     updateUi();
   });
   document.getElementById("range").addEventListener("input", (event) => {
