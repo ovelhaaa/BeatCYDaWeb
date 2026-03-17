@@ -1258,7 +1258,7 @@ class PenosaDesktopSim {
         // Em tracks SNARE (1), HATS (2) e CRASH (3), injetar ghost notes
         // em steps vazios com ~15% de chance e velocity 20..34
         if (trackIndex >= 1 && trackIndex <= 3) {
-          if ((this.randomUnit() * 100) < 15) {
+          if (this.randomUnit() < 0.15) {
             let ghostVelocity = 20 + Math.floor(this.randomUnit() * 15);
             track.pattern[i] = clamp(ghostVelocity, 1, 127);
           }
