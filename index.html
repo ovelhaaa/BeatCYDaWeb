@@ -38,6 +38,10 @@
           <span>Auto-rotate downbeat</span>
         </label>
         <label class="slider-block">
+          <span>Ghost Notes <strong id="ghostNotesValue">15%</strong></span>
+          <input id="ghostNotes" type="range" min="0" max="100" value="15">
+        </label>
+        <label class="slider-block">
           <span>Master <strong id="masterValue">75%</strong></span>
           <input id="master" type="range" min="0" max="100" value="75">
         </label>
@@ -46,7 +50,9 @@
       <div class="panel">
         <h2>Tracks</h2>
         <div id="trackButtons" class="track-grid"></div>
-        <div id="muteButtons" class="track-grid compact"></div>
+
+        <h3 class="sub-header">Mutes</h3>
+        <div id="muteButtons" class="track-grid"></div>
       </div>
 
       <div class="panel">
@@ -70,6 +76,10 @@
           <label class="slider-block">
             <span>Density <strong id="densityValue"></strong></span>
             <input id="density" type="range" min="0" max="100" value="60">
+          </label>
+          <label class="slider-block">
+            <span>Bass Prob <strong id="bassProbValue"></strong></span>
+            <input id="bassProb" type="range" min="0" max="100" value="100">
           </label>
           <label class="slider-block">
             <span>Range <strong id="rangeValue"></strong></span>

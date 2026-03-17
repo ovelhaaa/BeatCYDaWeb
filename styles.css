@@ -86,6 +86,16 @@ body {
   color: var(--green);
 }
 
+.sub-header {
+  margin: 16px 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dim);
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
 .row {
   display: flex;
   gap: 10px;
@@ -127,10 +137,6 @@ button.primary {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
-}
-
-.track-grid.compact {
-  margin-top: 10px;
 }
 
 .track-btn.active,

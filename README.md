@@ -6,7 +6,8 @@ Simulador desktop da Penosa para PC, feito em HTML/CSS/JavaScript.
 
 - Algoritmo euclidiano da Penosa com a mesma logica de `steps`, `hits`, `rotation` e `auto-rotate downbeat`
 - Visualizacao concentrica dos circulos no estilo do display
-- BassGroove com `density`, `range`, `scale` e `root`
+- BassGroove com `density`, `bassProb` (probabilidade de tocar), `range`, `scale` e `root`
+- Ghost Notes com controle de probabilidade global (afeta SNARE, HATS, CRASH)
 - Slots de preset com persistencia em `localStorage`
 - Audio via WebAudio com sintese mais proxima das vozes do firmware (`KickVoice`, `SnareVoice`, `HatsVoice`, `BassVoice`)
 - Laboratorio de algoritmo com seed deterministica, step manual, export/import de estado e debug do `BassGroove`
