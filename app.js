@@ -191,28 +191,21 @@ class BassGroove {
     };
   }
 
-  computeTriggerProbability(context) {
-    let probability = this.params.density * 0.18 + context.grooveEnergy * 0.36;
-    if (context.isDownbeat) {
-      probability = 0.98;
-    } else if (context.kick) {
-      probability = Math.max(probability, 0.68 + this.params.density * 0.2);
-    } else if (context.snare) {
-      probability = Math.max(probability, 0.4 + this.params.density * 0.22);
-    } else if (context.hatOpen) {
-      probability = Math.max(probability, 0.26 + this.params.density * 0.18);
-    } else if (context.hatClosed && this.restSteps > 0) {
-      probability = Math.max(probability, 0.14 + this.params.density * 0.15);
-    } else {
-      probability *= context.bassIsActive ? 0.45 : 0.18;
-    }
+  
+let probability = this.params.density;
 
-    if (this.restSteps >= 3) probability += 0.12;
-    if (context.activeCount >= 3) probability += 0.08;
-    if (context.bassIsActive && !context.kick && !context.snare) probability *= 0.82;
-    return clamp(probability, 0, 1);
-  }
+if (context.isDownbeat) {
+  probability = 0.95;
+} else if (context.kick) {
+  probability = 0.8 + this.params.density * 0.2;
+} else {
+  probability *= 0.3;
+}
 
+if (context.snare) probability = Math.max(probability, 0.32 + this.params.density * 0.1);
+if (context.hatOpen) probability = Math.max(probability, 0.22 + this.params.density * 0.08);
+
+return clamp(probability, 0, 1);
   buildNoteCandidates() {
     const candidates = [];
     const maxDistance = Math.max(4, this.params.range + 2);
@@ -522,7 +515,10 @@ class AudioEngine {
     return this.ctx.createBuffer(1, Math.max(1, Math.ceil(seconds * this.ctx.sampleRate)), this.ctx.sampleRate);
   }
 
-  buildKickBuffer(velocity) {
+  buildKickBuffer(event) {
+    const velocity = event.velocity;
+const accentBoost = event.accent ? 1.08 : 1.0;
+const ghostScale = event.ghost ? 0.55 : 1.0;
     const params = this.voiceParams[0];
     const buffer = this.makeBuffer(0.72);
     const out = buffer.getChannelData(0);
@@ -535,8 +531,7 @@ class AudioEngine {
     const driveFactor = 1 + params.drive * 4;
     const cutoffBase = 0.04 + params.drive * 0.08;
     const svfQ = 0.5 + params.timbre * 0.4;
-    let envGain = velocity;
-    let envPitch = 1.0;
+let envGain = clamp(velocity * accentBoost * ghostScale, 0, 1.1);    let envPitch = 1.0;
     let clickEnv = 1.0;
     let phase = 0.0;
     let svfLow = 0.0;
@@ -557,7 +552,7 @@ class AudioEngine {
       const sine = Math.sin(phase * Math.PI * 2);
       let shaped = sine * (1 + 0.5 * sine * sine);
       if (clickEnv > 0.001) {
-        shaped += clickEnv * (1 - 2 * phase) * (0.1 + params.timbre * 0.4);
+        shaped += clickEnv * (1 - 2 * phase) * (0.1 + params.timbre * 0.4 + (event.accent ? 0.08 : 0));
         clickEnv *= 0.5;
       }
 
@@ -579,6 +574,10 @@ class AudioEngine {
   }
 
   buildSnareBuffer(velocity) {
+    const velocity = event.velocity;
+const ghostMul = event.ghost ? 0.55 : 1.0;
+const dynDecay = params.decay * (0.4 + velocity * 0.6);
+const dynTimbre = params.timbre * (0.5 + velocity * 0.5) + (event.accent ? 0.08 : 0);
     const params = this.voiceParams[1];
     const buffer = this.makeBuffer(params.mode === 2 ? 0.85 : 0.52);
     const out = buffer.getChannelData(0);
@@ -656,9 +655,9 @@ class AudioEngine {
     const filterC2 = 0.28 + params.timbre * 0.15;
     const wireGain = 1 + params.timbre * 0.8;
     const clickGain = 0.5 + params.timbre * 1.0;
-    let envBody = velocity;
-    let envNoise = velocity;
-    let envClick = velocity;
+    let envBody = velocity * ghostMul;
+let envNoise = velocity * ghostMul;
+let envClick = velocity * ghostMul;
     let envPitch = 1.0;
     let wire1 = 0.0;
     let wire2 = 0.0;
@@ -703,7 +702,10 @@ class AudioEngine {
     return buffer;
   }
 
-  buildHatBuffer(velocity, open) {
+  buildHatBuffer(event, open) {
+    const velocity = event.velocity;
+const ghostMul = event.ghost ? 0.45 : 1.0;
+const accentMul = event.accent ? 1.12 : 1.0;
     const params = this.voiceParams[open ? 3 : 2];
     const buffer = this.makeBuffer(open ? 1.0 : 0.24);
     const out = buffer.getChannelData(0);
@@ -716,7 +718,7 @@ class AudioEngine {
     const ratios = [1.0, 1.48, 2.15, 3.71];
     const phase = [0, 0, 0, 0];
     const inc = ratios.map((ratio) => baseFreq * ratio * srInv);
-    let env = velocity;
+    let env = clamp(velocity * ghostMul * accentMul, 0, 1.1);;
     let svfLow = 0.0;
     let svfBand = 0.0;
     let rngState = open ? 0x7f3a2c91 : 0x1e9d4baf;
@@ -735,7 +737,7 @@ class AudioEngine {
       rngState = xorshift(rngState);
       const noise = ((rngState & 65535) / 32768) - 1;
       const mix = metal * (0.3 + params.timbre * 0.7) + noise * (0.6 - params.timbre * 0.4);
-      let f = (0.15 + params.timbre * 0.25) * 2;
+      let f = (0.15 + params.timbre * 0.25 + (event.accent ? 0.03 : 0)) * 2;
       if (f > 0.9) f = 0.9;
       const q = 0.5 + params.timbre * 0.5;
       const hp = mix - svfLow - q * svfBand;
@@ -746,14 +748,14 @@ class AudioEngine {
     return buffer;
   }
 
-  trigger(trackIndex, velocity, bassEvent = null) {
-    if (!this.ctx) return;
-    if (trackIndex === 0) this.playBuffer(this.buildKickBuffer(velocity));
-    if (trackIndex === 1) this.playBuffer(this.buildSnareBuffer(velocity));
-    if (trackIndex === 2) this.playBuffer(this.buildHatBuffer(velocity, false));
-    if (trackIndex === 3) this.playBuffer(this.buildHatBuffer(velocity, true));
-    if (trackIndex === 4 && bassEvent) this.triggerBass(this.ctx.currentTime, bassEvent);
-  }
+trigger(trackIndex, event, bassEvent = null) {
+  if (!this.ctx) return;
+  if (trackIndex === 0) this.playBuffer(this.buildKickBuffer(event));
+  if (trackIndex === 1) this.playBuffer(this.buildSnareBuffer(event));
+  if (trackIndex === 2) this.playBuffer(this.buildHatBuffer(event, false));
+  if (trackIndex === 3) this.playBuffer(this.buildHatBuffer(event, true));
+  if (trackIndex === 4 && bassEvent) this.triggerBass(this.ctx.currentTime, bassEvent);
+}
 
   triggerBass(time, event) {
     const params = this.voiceParams[VOICE_BASS];
@@ -1129,11 +1131,29 @@ class PenosaDesktopSim {
       }
     }
 
-    for (let i = 0; i < steps; i += 1) {
-      if (track.pattern[i] !== 0) {
-        track.pattern[i] = i % 4 === 0 ? 127 : 80;
+let firstHitFound = false;
+
+for (let i = 0; i < steps; i += 1) {
+  if (track.pattern[i] !== 0) {
+    let value;
+    if (!firstHitFound) {
+      value = 127;
+      firstHitFound = true;
+    } else {
+      value = 85;
+    }
+
+    const hum = Math.floor(this.randomUnit() * 11) - 5; // -5..+5
+    value = clamp(value + hum, 1, 127);
+    track.pattern[i] = value;
+  } else {
+    if (trackIndex === 1 || trackIndex === 2 || trackIndex === 3) {
+      if (this.randomUnit() < 0.15) {
+        track.pattern[i] = 20 + Math.floor(this.randomUnit() * 15); // 20..34
       }
     }
+  }
+}
   }
 
   randomize() {
@@ -1221,7 +1241,7 @@ class PenosaDesktopSim {
     });
   }
 
-  pushEventLog(step, events) {
+  buildSnareBuffer(event)Log(step, events) {
     const entry = {
       step,
       events,
@@ -1277,7 +1297,9 @@ class PenosaDesktopSim {
       if (track.patternLen <= 0 || this.trackMutes[i]) continue;
       const value = track.pattern[step % track.patternLen];
       if (value <= 0) continue;
-      const velocity = value === 1 ? 0.9 : value / 127;
+      const velocity = clamp(value / 127, 0, 1);
+const isGhost = value > 0 && value < 40;
+const isAccent = value >= 110;
       if (i === 0) {
         this.bassGroove.onKick();
         rhythm.kick = true;
@@ -1296,8 +1318,9 @@ class PenosaDesktopSim {
         rhythm.hatOpenVelocity = velocity;
       }
       if (i !== VOICE_BASS) {
-        this.audio.trigger(i, velocity);
-        events.push(`${TRACK_NAMES[i]}:${velocity.toFixed(2)}`);
+        this.audio.trigger(i, {   velocity,   accent: isAccent,   ghost: isGhost,   rawValue: value, });
+        const tag = isGhost ? "ghost" : (isAccent ? "accent" : "hit");
+events.push(`${TRACK_NAMES[i]}:${velocity.toFixed(2)}:${tag}`);
       }
     }
 
