@@ -1164,7 +1164,7 @@ class PenosaDesktopSim {
         }
         const hum = Math.floor(this.randomUnit() * 11) - 5;
         track.pattern[i] = clamp(baseVelocity + hum, 1, 127);
-      } else if (trackIndex === 1 || trackIndex === 2 || trackIndex === 3) {
+      } else if ([1, 2, 3].includes(trackIndex)) {
         if (this.randomUnit() < 0.15) {
           const ghostVel = 20 + Math.floor(this.randomUnit() * 15);
           track.pattern[i] = ghostVel;
