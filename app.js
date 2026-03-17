@@ -1,4 +1,4 @@
-0const SCREEN_W = 240;
+const SCREEN_W = 240;
 const SCREEN_H = 135;
 const CANVAS_SCALE = 3;
 const TRACK_COUNT = 5;
