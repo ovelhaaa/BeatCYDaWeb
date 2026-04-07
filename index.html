@@ -10,19 +10,19 @@
   <main class="device-shell">
     <section class="screen-shell">
       <div class="screen-topline">
-        <span>beatCYDa desktopSIM</span>
-        <span>máquina de grooves euclidiana</span>
+        <span>beatCYDa SIM</span>
+        <span>EUC GROOVE</span>
       </div>
       <canvas id="tft" width="720" height="405" aria-label="Display da CYDa"></canvas>
       <div class="screen-bottomline">
-        <span id="globalShortcutsHint">SPACE: PLAY/STOP · Track 1-5</span>
-        <span id="pageInputHint">↑↓ navegar · A/D ajustar · Enter confirmar · Backspace voltar</span>
+        <span id="globalShortcutsHint">SPC RUN/STOP · TRK 1-5</span>
+        <span id="pageInputHint">↑↓ SEL · A/D ± · ENT OK · BK RET</span>
       </div>
     </section>
 
     <nav class="mode-nav" aria-label="Navegação de páginas">
-      <button class="mode-btn active" data-page="performance">Performance</button>
-      <button class="mode-btn" data-page="track">Track Edit</button>
+      <button class="mode-btn active" data-page="performance">Perf</button>
+      <button class="mode-btn" data-page="track">Trk</button>
       <button class="mode-btn" data-page="bass">Bass</button>
       <button class="mode-btn" data-page="voice">Voice</button>
       <button class="mode-btn" data-page="slots">Slots</button>
@@ -31,12 +31,12 @@
 
     <section class="page-stage">
       <div class="panel page-panel" data-page="performance">
-        <h2>Transporte</h2>
+        <h2>Trns</h2>
         <div class="row">
-          <button id="playToggle" class="primary">Play</button>
-          <button id="stepBtn">Step</button>
-          <button id="randomizeBtn">Randomize</button>
-          <button id="panicBtn">Panic</button>
+          <button id="playToggle" class="primary">Run</button>
+          <button id="stepBtn">Stp</button>
+          <button id="randomizeBtn">Rand</button>
+          <button id="panicBtn">Pnc</button>
         </div>
         <label class="slider-block">
           <span>BPM <strong id="bpmValue">120</strong></span>
@@ -44,10 +44,10 @@
         </label>
         <label class="checkbox-line">
           <input id="autoRotate" type="checkbox">
-          <span>Auto-rotate downbeat</span>
+          <span>Auto Rot</span>
         </label>
         <label class="slider-block">
-          <span>Ghost Notes <strong id="ghostNotesValue">15%</strong></span>
+          <span>Ghost <strong id="ghostNotesValue">15%</strong></span>
           <input id="ghostNotes" type="range" min="0" max="100" value="15">
         </label>
         <label class="slider-block">
@@ -57,46 +57,46 @@
       </div>
 
       <div class="panel page-panel" data-page="track">
-        <h2>Tracks</h2>
+        <h2>Trk</h2>
         <div id="trackButtons" class="track-grid"></div>
 
-        <h3 class="sub-header">Mutes</h3>
+        <h3 class="sub-header">Mute</h3>
         <div id="muteButtons" class="track-grid"></div>
 
-        <h3 id="editorTitle" class="sub-header">Edit</h3>
+        <h3 id="editorTitle" class="sub-header">Edt</h3>
         <div id="drumEditor" class="editor-block">
           <label class="slider-block">
-            <span>Steps <strong id="stepsValue"></strong></span>
+            <span>Stp <strong id="stepsValue"></strong></span>
             <input id="steps" type="range" min="1" max="64" value="16">
           </label>
           <label class="slider-block">
-            <span>Hits <strong id="hitsValue"></strong></span>
+            <span>Hit <strong id="hitsValue"></strong></span>
             <input id="hits" type="range" min="0" max="64" value="4">
           </label>
           <label class="slider-block">
-            <span>Rotation <strong id="rotationValue"></strong></span>
+            <span>Rot <strong id="rotationValue"></strong></span>
             <input id="rotation" type="range" min="0" max="63" value="0">
           </label>
         </div>
       </div>
 
       <div class="panel page-panel" data-page="bass">
-        <h2>Bass Groove</h2>
+        <h2>Bass</h2>
         <div id="bassEditor" class="editor-block">
           <label class="slider-block">
-            <span>Density <strong id="densityValue"></strong></span>
+            <span>Dens <strong id="densityValue"></strong></span>
             <input id="density" type="range" min="0" max="100" value="60">
           </label>
           <label class="slider-block">
-            <span>Bass Prob <strong id="bassProbValue"></strong></span>
+            <span>Prob <strong id="bassProbValue"></strong></span>
             <input id="bassProb" type="range" min="0" max="100" value="100">
           </label>
           <label class="slider-block">
-            <span>Range <strong id="rangeValue"></strong></span>
+            <span>Rnge <strong id="rangeValue"></strong></span>
             <input id="range" type="range" min="1" max="12" value="7">
           </label>
           <label class="select-block">
-            <span>Scale</span>
+            <span>Scl</span>
             <select id="scale">
               <option value="0">MIN</option>
               <option value="1">MAJ</option>
@@ -112,7 +112,7 @@
       </div>
 
       <div class="panel page-panel" data-page="voice">
-        <h2>Voice DSP</h2>
+        <h2>Vce DSP</h2>
         <div id="kickVoiceEditor" class="editor-block hidden">
           <label class="slider-block">
             <span>Tune <strong id="kickTuneValue"></strong></span>
@@ -195,21 +195,21 @@
         <h2>Slots</h2>
         <div id="slotButtons" class="slot-grid"></div>
         <div class="row">
-          <button id="saveSlotBtn">Save Slot</button>
-          <button id="resetSlotsBtn">Factory Reset</button>
+          <button id="saveSlotBtn">Save</button>
+          <button id="resetSlotsBtn">Reset</button>
         </div>
       </div>
 
       <div class="panel page-panel" data-page="lab">
-        <h2>Algorithm Lab</h2>
+        <h2>Lab</h2>
         <label class="slider-block">
-          <span>Seed RNG</span>
+          <span>Seed</span>
           <input id="seedInput" type="number" min="1" max="4294967295" value="1592654542">
         </label>
         <div class="row">
-          <button id="applySeedBtn">Apply Seed</button>
-          <button id="exportStateBtn">Export State</button>
-          <button id="importStateBtn">Import State</button>
+          <button id="applySeedBtn">Apply</button>
+          <button id="exportStateBtn">Exp St</button>
+          <button id="importStateBtn">Imp St</button>
           <button id="exportWavBtn">Export WAV</button>
           <button id="exportMidiBtn">Export MIDI</button>
         </div>
