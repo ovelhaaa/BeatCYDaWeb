@@ -22,12 +22,12 @@ let uiPage = "performance";
 const pageSelectionIndex = {};
 
 const PAGE_HINTS = {
-  performance: "↑↓ escolher controle · A/D ajustar · Enter executar",
-  track: "↑↓ escolher parâmetro · A/D ajustar · Enter toggle · Backspace volta",
-  bass: "↑↓ escolher parâmetro · A/D ajustar · Enter toggle · Backspace volta",
-  voice: "↑↓ escolher parâmetro · A/D ajustar · Enter toggle · Backspace volta",
-  slots: "↑↓ escolher slot/ação · Enter confirmar · Backspace volta",
-  lab: "↑↓ escolher ação · A/D ajustar seed · Enter confirmar · Backspace volta",
+  performance: "↑↓ SEL · A/D ± · ENT ACT",
+  track: "↑↓ SEL · A/D ± · ENT TGL · BK RET",
+  bass: "↑↓ SEL · A/D ± · ENT TGL · BK RET",
+  voice: "↑↓ SEL · A/D ± · ENT TGL · BK RET",
+  slots: "↑↓ SEL · ENT OK · BK RET",
+  lab: "↑↓ SEL · A/D SD · ENT OK · BK RET",
 };
 
 function clamp(value, min, max) {
@@ -2145,7 +2145,7 @@ const inputMap = {
 };
 
 function updateUi() {
-  document.getElementById("playToggle").textContent = sim.isPlaying ? "Stop" : "Play";
+  document.getElementById("playToggle").textContent = sim.isPlaying ? "Stop" : "Run";
   document.getElementById("bpm").value = sim.bpm;
   document.getElementById("bpmValue").textContent = String(sim.bpm);
   document.getElementById("autoRotate").checked = sim.autoRotateDownbeat;
@@ -2160,7 +2160,7 @@ function updateUi() {
   });
   document.querySelectorAll(".mute-btn").forEach((button, index) => {
     button.classList.toggle("muted", sim.trackMutes[index]);
-    button.textContent = sim.trackMutes[index] ? `${TRACK_NAMES[index]} OFF` : `${TRACK_NAMES[index]} ON`;
+    button.textContent = sim.trackMutes[index] ? `${TRACK_NAMES[index]} MUT` : `${TRACK_NAMES[index]} ON`;
   });
   document.querySelectorAll(".slot-btn").forEach((button, index) => {
     button.classList.toggle("active", index === sim.currentSlot);
@@ -2171,7 +2171,7 @@ function updateUi() {
   const snareVoiceEditor = document.getElementById("snareVoiceEditor");
   const hatVoiceEditor = document.getElementById("hatVoiceEditor");
   const bassVoiceEditor = document.getElementById("bassVoiceEditor");
-  document.getElementById("editorTitle").textContent = `Edit ${TRACK_NAMES[sim.activeTrack]}`;
+  document.getElementById("editorTitle").textContent = `Edt ${TRACK_NAMES[sim.activeTrack]}`;
 
   const bass = sim.bassGroove.cloneParams();
   const bassVoice = sim.voiceParams[VOICE_BASS];
@@ -2236,7 +2236,7 @@ function updateUi() {
     document.getElementById("snareMode").value = String(voice.mode);
   } else if (sim.activeTrack === 2 || sim.activeTrack === 3) {
     const voice = sim.voiceParams[sim.activeTrack];
-    document.getElementById("hatModeLabel").textContent = sim.activeTrack === 2 ? "Closed hat model" : "Open hat model";
+    document.getElementById("hatModeLabel").textContent = sim.activeTrack === 2 ? "Hat Cls" : "Hat Opn";
     document.getElementById("hatDecay").value = Math.round(voice.decay * 100);
     document.getElementById("hatDecayValue").textContent = `${Math.round(voice.decay * 100)}%`;
     document.getElementById("hatTimbre").value = Math.round(voice.timbre * 100);
@@ -2302,7 +2302,7 @@ function bindUi() {
   sim.slots.forEach((_, index) => {
     const button = document.createElement("button");
     button.className = "slot-btn";
-    button.textContent = `Slot ${index + 1}`;
+    button.textContent = `S${index + 1}`;
     button.addEventListener("click", () => {
       sim.loadSlot(index);
       updateUi();
